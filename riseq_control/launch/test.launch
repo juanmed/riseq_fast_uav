@@ -1,0 +1,3 @@
+<launch>
+	<node pkg="riseq_control" type="position_controller_node" name="position_controller"/>
+</launch>
