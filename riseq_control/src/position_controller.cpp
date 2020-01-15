@@ -14,6 +14,8 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 
 		input_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/rateThrust", 1);
 
+		control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeControlInputs, this); // Define timer for constant loop rate
+
 		p_ref_ << 0., 0., 0.;
 		v_ref_ << 0., 0., 0.;
 		a_ref_ << 0., 0., 0.;
@@ -24,39 +26,34 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		v_ << 0., 0., 0.;
 		q_ = Eigen::Quaterniond::Identity();
 		angular_velocity_ << 0., 0., 0.;
-
-
 	}
 
-	void PositionController::computeControlInputs()
+	void PositionController::computeControlInputs(void)
 	{
 
 	}
 
-	void PositionController::publishControlInputs()
+	void PositionController::publishControlInputs(void)
 	{
 
 	}
 
-	void PositionController::trajectoryCallback(const geometry_msgs::PoseStamped& msg)
+	void PositionController::trajectoryCallback(const riseq_msgs::FlatTrajectory& msg)
 	{
-
+		
 	}
 
 	void PositionController::odometryCallback(const nav_msgs::Odometry& msg)
 	{
-
 		p_ << msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z;
 		v_ << msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z;
 		q_.w() =  msg.pose.pose.orientation.w;
 		q_.vec() << msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z;
 		angular_velocity_ << msg.twist.twist.angular.x , msg.twist.twist.angular.y, msg.twist.twist.angular.z;
-
 	}
 
 	void PositionController::positionCallback(const geometry_msgs::PoseStamped& msg)
 	{
-
 		p_ << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
 		q_.w() =  msg.pose.orientation.w;
 		q_.vec() << msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z;
@@ -66,7 +63,6 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{
 		v_ << msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z;
 		angular_velocity_ << msg.twist.angular.x , msg.twist.angular.y, msg.twist.angular.z;
-
 	}
 
 	PositionController::~PositionController()

@@ -1,3 +1,5 @@
 <launch>
-	<node pkg="riseq_control" type="position_controller_node" name="position_controller"/>
+	<node pkg="riseq_control" type="position_controller_node" name="position_controller">
+		<remap from="/riseq/uav/state" to="/uav/state"/>
+	</node>
 </launch>
