@@ -1,5 +1,13 @@
 <launch>
 	<node pkg="riseq_control" type="position_controller_node" name="position_controller">
 		<remap from="/riseq/uav/state" to="/uav/state"/>
+		<remap from="/riseq/uav/rateThrust" to="/uav/input/rateThrust"/>
+      	<param name="max_acc" value="10.0" />
+      	<param name="riseq/Kp_x" value="8.0" />
+      	<param name="riseq/Kp_y" value="8.0" />
+      	<param name="riseq/Kp_z" value="10.0" />
+      	<param name="riseq/Kd_x" value="1.5" />
+      	<param name="riseq/Kd_y" value="1.5" />
+      	<param name="riseq/Kd_z" value="3.3" />
 	</node>
 </launch>

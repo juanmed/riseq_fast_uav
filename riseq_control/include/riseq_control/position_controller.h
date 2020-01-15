@@ -1,3 +1,6 @@
+#ifndef POSITIONCONTROLLER_V12020_H
+#define POSITIONCONTROLLER_V12020_H
+
 #include <ros/ros.h>
 #include <Eigen/Dense>
 
@@ -5,8 +8,9 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <riseq_msgs/FlatTrajectory.h>
-//#include <mav_msgs/rateThrust.h>
+#include <mav_msgs/RateThrust.h>
 
+#include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
 
 class PositionController
 {
@@ -35,6 +39,11 @@ class PositionController
 		Eigen::Vector3d a_ref_;
 		Eigen::Vector3d j_ref_;
 		Eigen::Vector3d s_ref_;
+		Eigen::Quaterniond q_ref_;
+		Eigen::Vector3d angular_velocity_ref_;
+		double yaw_ref_;
+		double yaw_dot_ref_;
+		double yaw_ddot_ref_;
 
 		// vehicle state
 		Eigen::Vector3d p_;
@@ -47,7 +56,10 @@ class PositionController
 		Eigen::Vector3d desired_orientation_;
 		Eigen::Vector3d desired_angular_velocity_;
 
-		void computeControlInputs(void);
+		// controllers
+	  FeedbackLinearizationController * fb_controller_;
+
+		void computeControlInputs(const ros::TimerEvent& event);
 		void publishControlInputs(void);
 
 		void odometryCallback(const nav_msgs::Odometry& msg);
@@ -56,3 +68,5 @@ class PositionController
 		void trajectoryCallback(const riseq_msgs::FlatTrajectory& msg);
 
 };
+
+#endif

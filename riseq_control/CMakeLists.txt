@@ -4,6 +4,9 @@ project(riseq_control)
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
 
+add_definitions(-std=c++11)
+
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -32,14 +35,15 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   include
+  ${Boost_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
-  #${Eigen_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-add_library(${PROJECT_NAME}
-  src/position_controller.cpp
-)
+add_library(${PROJECT_NAME} src/position_controller.cpp)
+add_library(feedback_linearization_controller libs/feedback_linearization_controller/feedback_linearization_controller.cpp)
+
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the library
@@ -77,6 +81,8 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(position_controller_node src/position_controller_node.cpp)
 target_link_libraries(position_controller_node ${PROJECT_NAME} ${catkin_LIBRARIES})
+target_link_libraries(position_controller_node feedback_linearization_controller)
+
 #add_dependencies(position_controller_node ${catkin_EXPORTED_TARGETS})
 
 #add_dependencies(position_controller_node riseq_control_gencpp)
