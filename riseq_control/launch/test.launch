@@ -3,7 +3,6 @@
 
       <rosparam command="load" file="$(find riseq_common)/config/drones/$(arg mav_name).yaml"/>
 
-      <node pkg="riseq_common" type="flightgoggles_arm" name="flightgoggles_arm_node"/>
 	<node pkg="riseq_control" type="position_controller_node" name="position_controller" output="screen">
 		<remap from="/riseq/uav/state" to="/uav/state"/>
 		<remap from="/riseq/uav/rateThrust" to="/uav/input/rateThrust"/>
@@ -17,8 +16,9 @@
             <param name="riseq/Kd_z" value="1.0" />
             <param name="riseq/Kr" value="8.0"/>
 	</node>
+      <node pkg="riseq_common" type="flightgoggles_arm" name="flightgoggles_arm_node"/>
 
       <!-- /uav/state/pose/pose/position /riseq/uav/trajectory/pose/position -->
-      <!--node name="rqt_plot" type="rqt_plot" pkg="rqt_plot" args="/uav/input/rateThrust/thrust"/-->
+      <node name="rqt_plot" type="rqt_plot" pkg="rqt_plot" args="/uav/input/rateThrust/angular_rates"/>
 
 </launch>

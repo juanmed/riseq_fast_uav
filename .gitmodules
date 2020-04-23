@@ -1,0 +1,3 @@
+[submodule "riseq_control/libs"]
+	path = riseq_control/libs
+	url = https://github.com/juanmed/multicopter_controllers

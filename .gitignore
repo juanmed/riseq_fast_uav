@@ -1,0 +1,7 @@
+*.rosinstall
+*.rosinstall.bak
+CMakeLists.txt
+catkin_simple/
+dependencies.rosinstall
+eigen_catkin/
+mav_comm/

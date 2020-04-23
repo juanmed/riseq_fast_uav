@@ -11,8 +11,8 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		velocity_sub_ = nh_.subscribe("/riseq/uav/velocity", 1, &PositionController::velocityCallback, this, ros::TransportHints().tcpNoDelay());
 		input_publisher_ = nh_.advertise<mav_msgs::RateThrust>("/riseq/uav/rateThrust", 1);
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
-		control_loop_timer_ = nh_.createTimer(ros::Duration(0.02), &PositionController::computeControlInputs, this); // Define timer for constant loop rate
-		mid_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeMidControlInputs, this); // Define timer for constant loop rate
+		control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeControlInputs, this); // Define timer for constant loop rate
+		//mid_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeMidControlInputs, this); // Define timer for constant loop rate
 
 		// initialize members
 		p_ref_ << 0., 0., 0.;
@@ -37,20 +37,23 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		enable_output_ = false;
 
 		// get vehicle parameters
-		double mass;
+		double mass, gravity;
 	  if (!nh_private_.param<double>("riseq/mass", mass, 1.0)){
 	      std::cout << "Did not get mass from the params, defaulting to 1.0" << std::endl;
 	  }			
+	  if (!nh_private_.param<double>("riseq/gravity", gravity, 9.81)){
+	      std::cout << "Did not get mass from the params, defaulting to 1.0" << std::endl;
+	  }
 
-  	Eigen::Matrix3d vehicleInertia;
-	  if (!nh_private_.param<double>("riseq/Ixx", vehicleInertia(0, 0), 0.1)){
-	      std::cout << "Did not get Kp_x from the params, defaulting to 8.0" << std::endl;
+  	Eigen::Matrix3d vehicleInertia = Eigen::Matrix3d::Zero();
+	  if (!nh_private_.param<double>("riseq/Ixx", vehicleInertia(0, 0), 0.0049)){
+	      std::cout << "Did not get Ixx from the params, defaulting to 0.1" << std::endl;
 	  }		
-	  if (!nh_private_.param<double>("riseq/Iyy", vehicleInertia(1, 1), 0.1)){
-	      std::cout << "Did not get Kp_y from the params, defaulting to 8.0" << std::endl;
+	  if (!nh_private_.param<double>("riseq/Iyy", vehicleInertia(1, 1), 0.0049)){
+	      std::cout << "Did not get Iyy from the params, defaulting to 0.1" << std::endl;
 	  }	
-	  if (!nh_private_.param<double>("riseq/Izz", vehicleInertia(2, 2), 0.1)){
-	      std::cout << "Did not get Kp_z from the params, defaulting to 8.0" << std::endl;
+	  if (!nh_private_.param<double>("riseq/Izz", vehicleInertia(2, 2), 0.0069)){
+	      std::cout << "Did not get Izz from the params, defaulting to 0.1" << std::endl;
 	  }
 
 		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr = 0.;
@@ -82,7 +85,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		Ki_ << 0., 0., 0.;
 		Kr_  = Kr;
 
-		fb_controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia, Kp_, Kd_, Ki_, Kr_);
+		fb_controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia, Kp_, Kd_, Ki_, Kr_, gravity);
 	}
 
 	void PositionController::computeControlInputs(const ros::TimerEvent& event)
@@ -93,7 +96,9 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 			a_des = fb_controller_->computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 			thrust_vector_ = fb_controller_->computeDesiredThrustVector(q_, a_des);
 			desired_orientation_ = fb_controller_->computeDesiredOrientation(thrust_vector_, yaw_ref_);
-			//desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.normalized().toRotationMatrix(), desired_orientation_, euler_dot_ref_);
+			q_.normalize();
+			desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);
+			publishControlInputs();
 		}
 		else
 		{
@@ -105,6 +110,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{	
 		if(enable_output_)
 		{
+			q_.normalize();
 			desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);
 			publishControlInputs();
 		}
@@ -167,7 +173,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		v_ << msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z;
 		q_.w() =  msg.pose.pose.orientation.w;
 		q_.vec() << msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z;
-		q_ = q_.conjugate(); //transform from world-to-body to body-to-world rotation
+		//q_ = q_.conjugate(); //transform from world-to-body to body-to-world rotation... yes but NO NEED
 		angular_velocity_ << msg.twist.twist.angular.x , msg.twist.twist.angular.y, msg.twist.twist.angular.z;
 	}
 
