@@ -23,6 +23,8 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		j_ref_ << 0., 0., 0.;
 		s_ref_ << 0., 0., 0.;
 		q_ref_ = Eigen::Quaterniond::Identity();
+		angular_velocity_ref_ = Eigen::Vector3d::Zero();
+		angular_velocity_dot_ref_ = Eigen::Vector3d::Zero();
 		yaw_ref_ = 0.;
 		yaw_dot_ref_ = 0.;
 		yaw_ddot_ref_ = 0.;
@@ -97,11 +99,23 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		Ki_ << 0., 0., 0.;
 		Kr_  = Kr;
 
+		// if true, + configurate, else X configuration
 		Eigen::Matrix4d mixer_matrix = Eigen::Matrix4d::Zero();
-		mixer_matrix << Ct, Ct, Ct, Ct,
-										0., arm_length * Ct, 0., -arm_length * Ct,
-										-arm_length * Ct, 0., arm_length * Ct, 0.,
-										-Cq, Cq, -Cq, Cq;
+		if(false)
+		{
+			mixer_matrix << Ct, Ct, Ct, Ct,
+											0., arm_length * Ct, 0., -arm_length * Ct,
+											-arm_length * Ct, 0., arm_length * Ct, 0.,
+											-Cq, Cq, -Cq, Cq;
+		}
+		else
+		{
+			double m = std::sqrt(2.0)/2.0;
+			mixer_matrix << Ct, Ct, Ct, Ct,
+											m * arm_length * Ct, m * arm_length * Ct, -m * arm_length * Ct, -m * arm_length * Ct,
+											-m * arm_length * Ct, m * arm_length * Ct, m * arm_length * Ct, -m * arm_length * Ct,
+											-Cq, +Cq, -Cq, +Cq;
+		}		
 		mixer_matrix_inv_ = mixer_matrix.inverse();
 
 		fb_controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity);
@@ -143,7 +157,8 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{
 		if(enable_output_)
 		{
-			torque_vector_ = fb_controller_->computeDesiredTorque(angular_velocity_, desired_angular_velocity_, torque_ref_);
+			//torque_vector_ = fb_controller_->computeDesiredTorque(angular_velocity_, desired_angular_velocity_, torque_ref_);
+			torque_vector_ = fb_controller_->computeDesiredTorque2(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
 			rotor_rpms_ = fb_controller_-> computeRotorRPM(thrust_vector_.norm(), torque_vector_, mixer_matrix_inv_);
 			publishLowControlInputs();
 		}
@@ -152,7 +167,6 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 			// do nothing if output is disabled
 		}
 	}
-
 
 	void PositionController::publishHighControlInputs(void)
 	{
@@ -166,24 +180,21 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		command_msg.angular_rates.z = desired_angular_velocity_(2);
 
 		high_input_publisher_.publish(command_msg);
-
-		//debugging only
-		/*
-		Eigen::Quaterniond des_q(desired_orientation_);
-
-		geometry_msgs::PoseStamped desired_orientation_msg;
-		desired_orientation_msg.header.stamp = ros::Time::now();
-		desired_orientation_msg.header.frame_id = "map";
-		desired_orientation_msg.pose.orientation.x = des_q.x();
-		desired_orientation_msg.pose.orientation.y = des_q.y();
-		desired_orientation_msg.pose.orientation.z = des_q.z();
-		desired_orientation_msg.pose.orientation.w = des_q.w();
-		//rdes_publisher_.publish(desired_orientation_msg);
-		*/
 	}
 
 	void PositionController::publishLowControlInputs(void)
 	{
+
+		//debugging only
+		//Eigen::Quaterniond des_q(desired_orientation_);
+		geometry_msgs::PoseStamped desired_orientation_msg;
+		desired_orientation_msg.header.stamp = ros::Time::now();
+		desired_orientation_msg.header.frame_id = "map";
+		desired_orientation_msg.pose.orientation.x = torque_vector_(0); //des_q.x();
+		desired_orientation_msg.pose.orientation.y = torque_vector_(1); //des_q.y();
+		desired_orientation_msg.pose.orientation.z = torque_vector_(2); //des_q.z();
+		desired_orientation_msg.pose.orientation.w = 0.0; //des_q.w();
+		rdes_publisher_.publish(desired_orientation_msg);
 
 		mav_msgs::Actuators command_msg;
 		command_msg.header.stamp = ros::Time::now();
@@ -210,6 +221,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		yaw_ddot_ref_ = msg.yawddot;
 
 		angular_velocity_ref_ << msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z;
+		angular_velocity_dot_ref_ << msg.ub.x, msg.ub.y, msg.ub.z;
 		euler_dot_ref_ << msg.uc.x, msg.uc.y, msg.uc.z;
 		torque_ref_ << msg.ux.x, msg.ux.y, msg.ux.z;
 		enable_output_ = true;

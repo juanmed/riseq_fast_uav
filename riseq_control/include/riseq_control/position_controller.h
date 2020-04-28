@@ -46,6 +46,7 @@ class PositionController
 		Eigen::Vector3d s_ref_;
 		Eigen::Quaterniond q_ref_;
 		Eigen::Vector3d angular_velocity_ref_;
+		Eigen::Vector3d angular_velocity_dot_ref_;
 		Eigen::Vector3d euler_dot_ref_;
 		Eigen::Vector3d torque_ref_;
 		double yaw_ref_;
