@@ -1,3 +1,6 @@
 [submodule "riseq_control/libs"]
 	path = riseq_control/libs
 	url = https://github.com/juanmed/multicopter_controllers
+[submodule "riseq_common/libs/linear_algebra_utils"]
+	path = riseq_common/libs/linear_algebra_utils
+	url = https://github.com/juanmed/linear_algebra_utils
