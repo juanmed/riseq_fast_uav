@@ -12,6 +12,7 @@
 #include <mav_msgs/RateThrust.h>
 #include <mav_msgs/Actuators.h>
 #include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
+#include "../libs/fast_controller/fast_controller.h"
 
 class PositionController
 {
@@ -79,6 +80,7 @@ class PositionController
 
 		// controllers
 	  FeedbackLinearizationController * fb_controller_;
+	  FastController * fast_controller_;
 
 		void computeHighControlInputs(const ros::TimerEvent& event);
 		void computeMidControlInputs(const ros::TimerEvent& event);

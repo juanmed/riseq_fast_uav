@@ -17,13 +17,14 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  riseq_msgs  
+  riseq_msgs
+  riseq_common  
 )
 
 catkin_package(
   INCLUDE_DIRS include
 #  LIBRARIES riseq_control
-#  CATKIN_DEPENDS geometry_msgs mav_msgs nav_msgs roscpp rospy std_msgs
+  CATKIN_DEPENDS geometry_msgs mav_msgs nav_msgs roscpp rospy std_msgs riseq_common riseq_msgs
 #  DEPENDS system_lib
 )
 
@@ -43,6 +44,7 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME} src/position_controller.cpp)
 add_library(feedback_linearization_controller libs/feedback_linearization_controller/feedback_linearization_controller.cpp)
+add_library(fast_controller libs/fast_controller/fast_controller.cpp)
 
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
@@ -82,6 +84,7 @@ target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 add_executable(position_controller_node src/position_controller_node.cpp)
 target_link_libraries(position_controller_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 target_link_libraries(position_controller_node feedback_linearization_controller)
+target_link_libraries(position_controller_node fast_controller)
 
 #add_dependencies(position_controller_node ${catkin_EXPORTED_TARGETS})
 

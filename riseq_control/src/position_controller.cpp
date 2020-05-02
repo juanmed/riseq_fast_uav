@@ -1,6 +1,5 @@
 #include "riseq_control/position_controller.h"
 
-
 PositionController::PositionController(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private): 
 	nh_(nh),
 	nh_private_(nh_private)
@@ -48,18 +47,18 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	      std::cout << "Did not get mass from the params, defaulting to 1.0" << std::endl;
 	  }			
 	  if (!nh_private_.param<double>("riseq/gravity", gravity, 9.81)){
-	      std::cout << "Did not get mass from the params, defaulting to 1.0" << std::endl;
+	      std::cout << "Did not get gravity from the params, defaulting to 9.81" << std::endl;
 	  }
 
   	vehicleInertia_ = Eigen::Matrix3d::Zero();
 	  if (!nh_private_.param<double>("riseq/Ixx", vehicleInertia_(0, 0), 0.0049)){
-	      std::cout << "Did not get Ixx from the params, defaulting to 0.1" << std::endl;
+	      std::cout << "Did not get Ixx from the params, defaulting to 0.0049" << std::endl;
 	  }		
 	  if (!nh_private_.param<double>("riseq/Iyy", vehicleInertia_(1, 1), 0.0049)){
-	      std::cout << "Did not get Iyy from the params, defaulting to 0.1" << std::endl;
+	      std::cout << "Did not get Iyy from the params, defaulting to 0.0049" << std::endl;
 	  }	
 	  if (!nh_private_.param<double>("riseq/Izz", vehicleInertia_(2, 2), 0.0069)){
-	      std::cout << "Did not get Izz from the params, defaulting to 0.1" << std::endl;
+	      std::cout << "Did not get Izz from the params, defaulting to 0.0069" << std::endl;
 	  }
 
 		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr, Ct, Cq, arm_length  = 0.;
@@ -91,8 +90,8 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	  if (!nh_private_.param<double>("riseq/torque_coeff", Cq, 2.6e-7)){
 	      std::cout << "Did not get torque coefficient from the params, defaulting to 2.6e-7" << std::endl;
 	  }
-	  if (!nh_private_.param<double>("riseq/torque_coeff", arm_length, 0.08)){
-	      std::cout << "Did not get torque coefficient from the params, defaulting to 0.08" << std::endl;
+	  if (!nh_private_.param<double>("riseq/arm_length", arm_length, 0.08)){
+	      std::cout << "Did not get arm length from the params, defaulting to 0.08" << std::endl;
 	  }
 		Kp_ << Kp_x, Kp_y, Kp_z;
 		Kd_ << Kd_x, Kd_y, Kd_z;
@@ -119,6 +118,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		mixer_matrix_inv_ = mixer_matrix.inverse();
 
 		fb_controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity);
+		fast_controller_ = new FastController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity, 0.01, 4);
 	}
 
 	void PositionController::computeHighControlInputs(const ros::TimerEvent& event)
@@ -132,6 +132,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 			q_.normalize();
 			desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);
 			publishHighControlInputs();
+			fast_controller_ -> computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 		}
 		else
 		{
@@ -186,15 +187,20 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{
 
 		//debugging only
-		//Eigen::Quaterniond des_q(desired_orientation_);
+		/*
+		Eigen::Quaterniond des_q(desired_orientation_);
 		geometry_msgs::PoseStamped desired_orientation_msg;
 		desired_orientation_msg.header.stamp = ros::Time::now();
 		desired_orientation_msg.header.frame_id = "map";
-		desired_orientation_msg.pose.orientation.x = torque_vector_(0); //des_q.x();
-		desired_orientation_msg.pose.orientation.y = torque_vector_(1); //des_q.y();
-		desired_orientation_msg.pose.orientation.z = torque_vector_(2); //des_q.z();
-		desired_orientation_msg.pose.orientation.w = 0.0; //des_q.w();
+		desired_orientation_msg.pose.position.x = thrust_vector_.normalized()(0);
+		desired_orientation_msg.pose.position.y = thrust_vector_.normalized()(1);
+		desired_orientation_msg.pose.position.z = thrust_vector_.normalized()(2);
+		desired_orientation_msg.pose.orientation.x = yaw_ref_; //des_q.x();
+		desired_orientation_msg.pose.orientation.y = v_(1); //des_q.y();
+		desired_orientation_msg.pose.orientation.z = v_ref_(0); //des_q.z();
+		desired_orientation_msg.pose.orientation.w = v_ref_(1); //des_q.w();
 		rdes_publisher_.publish(desired_orientation_msg);
+		*/
 
 		mav_msgs::Actuators command_msg;
 		command_msg.header.stamp = ros::Time::now();
