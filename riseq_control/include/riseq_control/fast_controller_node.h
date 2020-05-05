@@ -1,5 +1,5 @@
-#ifndef POSITIONCONTROLLER_V12020_H
-#define POSITIONCONTROLLER_V12020_H
+#ifndef FASTCONTROLLERNODE_V12020_H
+#define FASTCONTROLLERNODE_V12020_H
 
 #include <ros/ros.h>
 #include <iostream>
@@ -11,15 +11,14 @@
 #include <riseq_msgs/FlatTrajectory.h>
 #include <mav_msgs/RateThrust.h>
 #include <mav_msgs/Actuators.h>
-#include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
 #include "../libs/fast_controller/fast_controller.h"
+#include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
 
-class PositionController
+class FastControllerNode
 {
 	public:
-
-		PositionController(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
-		virtual ~ PositionController();
+		FastControllerNode(const ros::NodeHandle& nh, const ros::NodeHandle& nh_private);
+		virtual ~ FastControllerNode();
 
 	private:
 
@@ -37,7 +36,7 @@ class PositionController
 		ros::Timer low_control_loop_timer_;
 
 		// flow control 
-		bool enable_output_;
+		bool trajectory_received_, state_received_ = false;
 
 		// reference trajectory
 		Eigen::Vector3d p_ref_;
@@ -53,6 +52,7 @@ class PositionController
 		double yaw_ref_;
 		double yaw_dot_ref_;
 		double yaw_ddot_ref_;
+		double thrust_ref_;
 
 		// vehicle state
 		Eigen::Vector3d p_;
@@ -61,11 +61,14 @@ class PositionController
 		Eigen::Vector3d angular_velocity_;
 
 		// control quantities
-		Eigen::Vector3d thrust_vector_;
+		Eigen::Vector3d collective_thrust_vector_;
+		Eigen::Vector3d collective_thrust_vector_dot_;
 		Eigen::Matrix3d desired_orientation_;
 		Eigen::Vector3d desired_angular_velocity_;
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
+		double collective_thrust_;
+		double command_thrust_;
 
 		// control gains
 		Eigen::Vector3d Kp_;
@@ -79,11 +82,9 @@ class PositionController
 
 
 		// controllers
-	  FeedbackLinearizationController * fb_controller_;
-	  FastController * fast_controller_;
+	  FastController * controller_;
 
 		void computeHighControlInputs(const ros::TimerEvent& event);
-		void computeMidControlInputs(const ros::TimerEvent& event);
 		void computeLowControlInputs(const ros::TimerEvent& event);
 
 		void publishHighControlInputs(void);
@@ -98,4 +99,4 @@ class PositionController
 
 };
 
-#endif
+#endif /* FASTCONTROLLERNODE_V12020_H */

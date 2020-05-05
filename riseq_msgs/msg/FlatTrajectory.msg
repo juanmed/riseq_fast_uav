@@ -12,3 +12,4 @@ geometry_msgs/Vector3 snap
 float64 yaw
 float64 yawdot
 float64 yawddot
+float64 thrust
