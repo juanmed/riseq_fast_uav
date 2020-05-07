@@ -67,7 +67,7 @@ class Trajectory_Generator2():
         #self.waypoints = self.get_goal_waypoint( 8, 0 ,1.67)   
         #self.waypoints = trajGen3D.get_leminiscata_waypoints(4*np.pi, 18, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         self.waypoints = trajGen3D.get_helix_waypoints(2*np.pi, 9, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
-        #self.waypoints = trajGen3D.get_poly_waypoints(5, 5, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
+        #self.waypoints = trajGen3D.get_poly_waypoints(5, 6, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         #self.waypoints = self.get_gate_waypoints()
         #print("Waypoints: ")
         #print(self.waypoints)

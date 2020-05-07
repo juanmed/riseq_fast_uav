@@ -66,7 +66,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	      vehicleInertia_(2, 2) = 0.0069;
 	  }
 
-		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr, Ct, Cq, arm_length  = 0.;
+		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr, Ko, Ct, Cq, arm_length  = 0.;
 
 	  if (!ros::param::get("riseq/Kp_x", Kp_x)){
 	      std::cout << "Did not get Kp_x from the params, defaulting to 4.0" << std::endl;
@@ -96,6 +96,10 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	      std::cout << "Did not get Kr from the params, defaulting to 8.0" << std::endl;
 	      Kr = 8.0;
 	  }
+	  if (!ros::param::get("riseq/Ko", Ko)){
+	      std::cout << "Did not get Ko from the params, defaulting to 2.0" << std::endl;
+	      Kr = 2.0;
+	  }
 	  if (!ros::param::get("riseq/thrust_coeff", Ct)){
 	      std::cout << "Did not get thrust coefficient from the params, defaulting to 1.91e-6" << std::endl;
 	      Ct = 1.91e-6;
@@ -111,7 +115,8 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		Kp_ << Kp_x, Kp_y, Kp_z;
 		Kd_ << Kd_x, Kd_y, Kd_z;
 		Ki_ << 0., 0., 0.;
-		Kr_  = Kr;
+		Kr_ = Kr;
+		Ko_ = Ko;
 
 		// if true, + configurate, else X configuration
 		Eigen::Matrix4d mixer_matrix = Eigen::Matrix4d::Zero();
@@ -133,7 +138,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		mixer_matrix_inv_ = mixer_matrix.inverse();
 
 		//controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity);
-		controller_ = new FastController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity, 0.01, 4);
+		controller_ = new FastController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, Ko_, gravity, 0.01, 4);
 	}
 
 	void FastControllerNode::computeHighControlInputs(const ros::TimerEvent& event)
@@ -141,15 +146,16 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		if(trajectory_received_ & state_received_)
 		{
 			Eigen::Vector3d a_des, a_cmd;
-			a_des = controller_->computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
+			a_des = controller_ -> computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 			collective_thrust_ = controller_ -> computeCollectiveThrust(q_, a_des, v_, thrust_ref_);
 			command_thrust_ = controller_ -> computeCommandThrust(q_, v_, collective_thrust_);
 			collective_thrust_vector_ = controller_ -> computeCollectiveThrustVector(a_des, v_, collective_thrust_);
-			desired_orientation_ = controller_->computeDesiredOrientation(q_, collective_thrust_vector_, yaw_ref_);
+			desired_orientation_ = controller_ -> computeDesiredOrientation(q_, collective_thrust_vector_, yaw_ref_);
 			q_.normalize();
 			a_cmd = controller_ -> computeCommandAcceleration(q_, v_, collective_thrust_);
 			collective_thrust_vector_dot_ = controller_ -> computeCollectiveThrustVectorDot(v_, v_ref_, a_cmd, a_ref_, j_ref_);
-			desired_angular_velocity_ = controller_->computeDesiredAngularVelocity(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
+			desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
+			desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
 			publishHighControlInputs();
 		}
 		else
@@ -162,9 +168,18 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	{
 		if(trajectory_received_ & state_received_)
 		{
-			//torque_vector_ = controller_->computeDesiredTorque(angular_velocity_, desired_angular_velocity_, torque_ref_);
-			torque_vector_ = controller_->computeDesiredTorque(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
-			rotor_rpms_ = controller_-> computeRotorRPM(collective_thrust_vector_.norm(), torque_vector_, mixer_matrix_inv_);
+			//torque_vector_ = controller_ -> computeDesiredTorque(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
+			
+			collective_thrust_vector_ddot_ = controller_ -> computeCollectiveThrustVectorDDot(a_, a_ref_, j_, j_ref_, s_ref_);
+			desired_orientation_ddot_ = controller_ -> computeDesiredOrientationDDot(collective_thrust_vector_,
+			collective_thrust_vector_dot_, collective_thrust_vector_ddot_, desired_orientation_, desired_orientation_dot_,
+			yaw_ref_, yaw_dot_ref_, yaw_ddot_ref_ );
+			desired_angular_velocity_dot_ = controller_ -> computeDesiredAngularVelocityDot(desired_orientation_, desired_orientation_ddot_,
+				desired_angular_velocity_);
+			torque_vector_ = controller_ -> computeDesiredTorque2(q_.toRotationMatrix(), desired_orientation_, desired_angular_velocity_dot_, angular_velocity_, desired_angular_velocity_);
+			
+
+			rotor_rpms_ = controller_ -> computeRotorRPM(collective_thrust_vector_.norm(), torque_vector_, mixer_matrix_inv_);
 			publishLowControlInputs();
 		}
 		else

@@ -1,6 +1,7 @@
 #include "riseq_control/position_controller.h"
 #include "riseq_control/fast_controller_node.h"
 
+
 int main(int argc, char** argv){
 
 	ros::init(argc, argv, "position_controller");

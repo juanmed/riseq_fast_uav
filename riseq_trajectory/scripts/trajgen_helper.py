@@ -27,7 +27,7 @@ def get_poly_waypoints(t,n, init_pos = (0,0,0)):
             z = k2*t
         Output waypoints shape is [n, 3]
     """
-    waypoints_t = np.linspace(0, t, n)
+    waypoints_t = np.linspace(0., t, n)
     k1 = 1.0
     k2 = 1.0
     k3 = 1.0
@@ -72,8 +72,8 @@ def get_helix_waypoints(t, n, init_pos = (0,0,0)):
     """
     waypoints_t = np.linspace(0, t, n)
 
-    a = 5
-    b = 5
+    a = 3
+    b = 3
     c = 1
 
     wx = 1.0#waypoints_t*1/t #

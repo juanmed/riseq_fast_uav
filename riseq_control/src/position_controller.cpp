@@ -118,7 +118,6 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		mixer_matrix_inv_ = mixer_matrix.inverse();
 
 		fb_controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity);
-		fast_controller_ = new FastController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity, 0.01, 4);
 	}
 
 	void PositionController::computeHighControlInputs(const ros::TimerEvent& event)
@@ -132,7 +131,6 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 			q_.normalize();
 			desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);
 			publishHighControlInputs();
-			fast_controller_ -> computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 		}
 		else
 		{

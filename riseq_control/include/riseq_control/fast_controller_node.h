@@ -59,12 +59,17 @@ class FastControllerNode
 		Eigen::Vector3d v_;
 		Eigen::Quaterniond q_;
 		Eigen::Vector3d angular_velocity_;
+		Eigen::Vector3d a_, j_ = Eigen::Vector3d::Zero();
 
 		// control quantities
 		Eigen::Vector3d collective_thrust_vector_;
 		Eigen::Vector3d collective_thrust_vector_dot_;
+		Eigen::Vector3d collective_thrust_vector_ddot_;
 		Eigen::Matrix3d desired_orientation_;
+		Eigen::Matrix3d desired_orientation_dot_;
+		Eigen::Matrix3d desired_orientation_ddot_;
 		Eigen::Vector3d desired_angular_velocity_;
+		Eigen::Vector3d desired_angular_velocity_dot_;
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
 		double collective_thrust_;
@@ -74,7 +79,7 @@ class FastControllerNode
 		Eigen::Vector3d Kp_;
 		Eigen::Vector3d Kd_;
 		Eigen::Vector3d Ki_;
-		double Kr_;
+		double Kr_, Ko_;
 
 		// Vehicle physical quantities
 		Eigen::Matrix3d vehicleInertia_;
