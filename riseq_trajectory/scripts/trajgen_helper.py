@@ -62,7 +62,7 @@ def get_leminiscata_waypoints(t,n, init_pos = (0,0,0)):
 
     x = k1*np.cos(w*waypoints_t/2.0)+ x0 - k1
     y = k2*np.sin(w*waypoints_t) + y0
-    z = waypoints_t*k3 + z0 #k2*waypoints_t + z0
+    z = waypoints_t*k3/t + z0 #k2*waypoints_t + z0
 
     return np.stack((x, y, z), axis=-1)
 
@@ -72,9 +72,9 @@ def get_helix_waypoints(t, n, init_pos = (0,0,0)):
     """
     waypoints_t = np.linspace(0, t, n)
 
-    a = 3
-    b = 3
-    c = 1
+    a = 12
+    b = 12
+    c = 3
 
     wx = 1.0#waypoints_t*1/t #
     wy = 1.0#waypoints_t*1/t #[2.*(1-np.exp(-0.5*a)) for a in waypoints_t]
@@ -84,7 +84,7 @@ def get_helix_waypoints(t, n, init_pos = (0,0,0)):
     # positions in helix
     x = a*np.cos(wx*waypoints_t) + x0 - a
     y = b*np.sin(wy*waypoints_t) + y0
-    z = c*waypoints_t + z0 # np.ones_like(waypoints_t)*3.0  
+    z = c*waypoints_t/t + z0 # np.ones_like(waypoints_t)*3.0  
 
     #x = 0.5*np.cos(waypoints_t)
     #y = 0.5*np.sin(waypoints_t)
@@ -328,3 +328,74 @@ def get_poly_cc(n, k, t):
         cc[i] = c * np.power(t, D[i])
 
     return cc
+
+def gen_helix_trajectory2(t, init_pose):
+    """
+        This function returns the trajectory: position, velocity,
+        acceleration, jerk and snap an object going through a 3D helix 
+        should have.
+    """
+    t = t/2
+
+    a = 2.0
+    b = 2.0
+    c = 4.0
+
+    wx = 0.5
+    wy = 1.0
+
+    x_0 = init_pose[0]
+    y_0 = init_pose[1]
+    z_0 = init_pose[2]
+
+    # positions in helix
+    x = a*np.cos(wx*t) - a + x_0
+    y = b*np.sin(wy*t) + y_0
+    z = c*t + z_0
+    #psi = 0.0*np.ones_like(t)
+    #tangent_vector = map(lambda a,b,c: np.matrix([[a],[b],[0]]),-a*wx*np.sin(wx*t),b*wy*np.cos(wy*t),c)
+    psi = np.sin(t)
+    #psi = np.arccos( )
+
+    # velocities in helix
+    v_x = -a*wx*np.sin(wx*t)
+    v_y = b*wy*np.cos(wy*t)
+    v_z = c*np.ones_like(t)
+    psi_rate = np.cos(t)#0.0*np.ones_like(t)
+
+    # accelerations in helix
+    a_x = -(wx**2)*(x - x_0)
+    a_y = -(wy**2)*(y - y_0)
+    a_z = 0.0*np.ones_like(t)
+    psi_dd = -1.0*np.sin(t)#0.0*np.ones_like(t)
+
+    # jerks in helix
+    j_x = -(wx**2)*(v_x)
+    j_y = -(wy**2)*(v_y)
+    j_z = 0.0*np.ones_like(t)
+    psi_ddd = -1.0*np.cos(t)#0.0*np.ones_like(t)
+
+    # snap in helix
+    s_x = -(wx**2)*(a_x)
+    s_y = -(wy**2)*(a_y)
+    s_z = 0.0*np.ones_like(t)
+    psi_dddd = np.sin(t) #0.0*np.ones_like(t)
+
+    if z >= (z_0 + c):
+        z = z_0 + c
+        v_z = 0.
+
+    # pack everything
+    pos = np.array([x,y,z])
+    vel = np.array([v_x,v_y,v_z])
+    acc = np.array([a_x,a_y,a_z])
+    jerk = np.array([j_x,j_y,j_z])
+    snap = np.array([s_x,s_y,s_z])
+
+    psi = 0.
+    psi_rate = 0.
+    psi_dd = 0.
+    psi_ddd = 0.
+    psi_dddd = 0.
+
+    return [pos,vel,acc,jerk,snap, psi, psi_rate, psi_dd, psi_ddd, psi_dddd]

@@ -8,6 +8,7 @@ int main(int argc, char** argv){
 	ros::NodeHandle nh("");
 	ros::NodeHandle nh_private("~");
 
+	//PositionController *controller = new PositionController(nh, nh_private);
 	FastControllerNode *controller = new FastControllerNode(nh, nh_private);
 	ros::spin();
 	return 0;

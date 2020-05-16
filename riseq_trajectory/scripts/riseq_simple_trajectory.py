@@ -20,6 +20,7 @@ class Trajectory_Generator2():
         # first compute waypoints: the first one is the initial position
         # and orientation, and the rest are the position of the gates
 
+        """
         self.waypoints = self.get_vertical_waypoints(1)
         print("Waypoints: ")
         print(self.waypoints)
@@ -31,10 +32,10 @@ class Trajectory_Generator2():
         print(self.coeff_y)
         print("coeff Z:")
         print(self.coeff_z)
-
+        """
         # initialize time for trajectory generator
         self.start_time = rospy.get_time()
-
+        
         # initialize heading
         self.init_pose = rospy.get_param("/uav/flightgoggles_uav_dynamics/init_pose")
         init_quat = [self.init_pose[3],self.init_pose[4],self.init_pose[5],self.init_pose[6]]
@@ -66,19 +67,19 @@ class Trajectory_Generator2():
         #self.waypoints = self.get_waypoint_list(point_list)
         #self.waypoints = self.get_goal_waypoint( 8, 0 ,1.67)   
         #self.waypoints = trajGen3D.get_leminiscata_waypoints(4*np.pi, 18, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
-        self.waypoints = trajGen3D.get_helix_waypoints(2*np.pi, 9, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
+        self.waypoints = trajGen3D.get_helix_waypoints(6*np.pi, 20, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         #self.waypoints = trajGen3D.get_poly_waypoints(5, 6, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         #self.waypoints = self.get_gate_waypoints()
-        #print("Waypoints: ")
-        #print(self.waypoints)
+        print("Waypoints: ")
+        print(self.waypoints)
         (self.coeff_x, self.coeff_y, self.coeff_z) = trajGen3D.get_MST_coefficients(self.waypoints)
 
-        print("coeff X:")
-        print(self.coeff_x)
-        print("coeff Y:")
-        print(self.coeff_y)
-        print("coeff Z:")
-        print(self.coeff_z)
+        #print("coeff X:")
+        #print(self.coeff_x)
+        #print("coeff Y:")
+        #print(self.coeff_y)
+        #print("coeff Z:")
+        #print(self.coeff_z)
         init_quat = [self.init_pose[3],self.init_pose[4],self.init_pose[5],self.init_pose[6]]
         yaw, pitch, roll = tf.transformations.euler_from_quaternion(init_quat, axes = "rzyx")
         print("Init Roll: {}, Pitch: {}, Yaw: {}".format(roll, pitch, yaw))
@@ -87,10 +88,11 @@ class Trajectory_Generator2():
         #print("Yaw: {}, Heading: {}".format(trajGen3D.yaw,trajGen3D.current_heading))   
 
     def compute_reference_traj(self, time):
-        vel = 1.0
+        vel = 3.0
         trajectory_time = time - self.start_time
-        #print("Time traj: {}".format(trajectory_time))
         flatout_trajectory = trajGen3D.generate_trajectory(trajectory_time, vel, self.waypoints, self.coeff_x, self.coeff_y, self.coeff_z)
+        #flatout_trajectory = trajGen3D.gen_helix_trajectory2(trajectory_time, self.init_pose)
+        #print(flatout_trajectory[0])
         ref_trajectory = df_flat.compute_ref(flatout_trajectory)
         return ref_trajectory
 
@@ -152,7 +154,7 @@ def pub_traj():
     rospy.init_node('uav_ref_trajectory_input_publisher', anonymous=True)
 
     # wait time for simulator to get ready...
-    wait_time = int(rospy.get_param("riseq/trajectory_wait"))
+    wait_time = int(rospy.get_param("riseq/trajectory_wait",1))
     while( rospy.Time.now().to_sec() < wait_time ):
         if( ( int(rospy.Time.now().to_sec()) % 1) == 0 ):
             rospy.loginfo("Starting Trajectory Generator in {:.2f} seconds".format(wait_time - rospy.Time.now().to_sec()))
@@ -163,7 +165,7 @@ def pub_traj():
     traj_gen = Trajectory_Generator2()
     # traj_gen = Trajectory_Generator_Test()
     traj_gen.compute_waypoints()
-    rospy.sleep(0.1)
+    #rospy.sleep(0.1)
 
     # IMPORTANT WAIT TIME!
     # If this is not here, the "start_time" in the trajectory generator is 
@@ -171,7 +173,7 @@ def pub_traj():
     # time for the trajectory will be degenerated
 
     # publish at 10Hz
-    rate = rospy.Rate(200.0)
+    rate = rospy.Rate(100.0)
 
     while not rospy.is_shutdown():
         
@@ -240,7 +242,7 @@ def pub_traj():
             traj.ua.y = uay
             traj.ua.z = uaz
 
-            traj.ub.x = np.linalg.norm(ref_traj[5])  # ubx
+            traj.ub.x = ubx #np.linalg.norm(ref_traj[5])  # ubx
             traj.ub.y = uby
             traj.ub.z = ubz
 
@@ -278,8 +280,8 @@ def pub_traj():
 
             #traj_gen.trajectory_update(time)
 
-        except Exception:
-            #rospy.loginfo('People...we have a problem: {}'.format(Exception))
+        except Exception as e:
+            rospy.loginfo('People...we have a problem: {}'.format(str(e)))
             continue
 
 if __name__ == '__main__':

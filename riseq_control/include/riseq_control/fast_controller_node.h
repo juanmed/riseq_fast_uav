@@ -11,6 +11,7 @@
 #include <riseq_msgs/FlatTrajectory.h>
 #include <mav_msgs/RateThrust.h>
 #include <mav_msgs/Actuators.h>
+#include <sensor_msgs/Imu.h>
 #include "../libs/fast_controller/fast_controller.h"
 #include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
 
@@ -28,6 +29,7 @@ class FastControllerNode
 		ros::Subscriber state_sub_;
 		ros::Subscriber position_sub_;
 		ros::Subscriber velocity_sub_;
+		ros::Subscriber imu_sub_;
 		ros::Publisher high_input_publisher_;
 		ros::Publisher low_input_publisher_;
 		ros::Publisher rdes_publisher_;
@@ -36,7 +38,7 @@ class FastControllerNode
 		ros::Timer low_control_loop_timer_;
 
 		// flow control 
-		bool trajectory_received_, state_received_ = false;
+		bool trajectory_received_, state_received_, imu_received_ = false;
 
 		// reference trajectory
 		Eigen::Vector3d p_ref_;
@@ -75,6 +77,9 @@ class FastControllerNode
 		double collective_thrust_;
 		double command_thrust_;
 
+		// sensors
+		Eigen::Vector3d a_imu_;
+
 		// control gains
 		Eigen::Vector3d Kp_;
 		Eigen::Vector3d Kd_;
@@ -84,7 +89,13 @@ class FastControllerNode
 		// Vehicle physical quantities
 		Eigen::Matrix3d vehicleInertia_;
 		Eigen::Matrix4d mixer_matrix_inv_;
+		double gravity_, cd1_;
+		int rotor_count_;
 
+ 		// basis vector generating R^3
+ 		Eigen::Vector3d e1_;
+ 		Eigen::Vector3d e2_;
+ 		Eigen::Vector3d e3_;
 
 		// controllers
 	  FastController * controller_;
@@ -99,6 +110,7 @@ class FastControllerNode
 		void positionCallback(const geometry_msgs::PoseStamped& msg);
 		void velocityCallback(const geometry_msgs::TwistStamped& msg);
 		void trajectoryCallback(const riseq_msgs::FlatTrajectory& msg);
+		void imuCallback(const sensor_msgs::Imu& msg);
 
 		void initializeParameters(void);
 

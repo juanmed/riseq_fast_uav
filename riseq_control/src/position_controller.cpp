@@ -13,7 +13,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
 		high_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeHighControlInputs, this); // Define timer for constant loop rate
 		//mid_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeMidControlInputs, this); // Define timer for constant loop rate
-	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(0.005), &PositionController::computeLowControlInputs, this);
+	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(5), &PositionController::computeLowControlInputs, this);
 
 		// initialize members
 		p_ref_ << 0., 0., 0.;

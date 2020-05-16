@@ -8,11 +8,12 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		state_sub_ = nh_.subscribe("/riseq/uav/state", 1, &FastControllerNode::odometryCallback, this, ros::TransportHints().tcpNoDelay());
 		position_sub_ = nh_.subscribe("/riseq/uav/position", 1, &FastControllerNode::positionCallback, this, ros::TransportHints().tcpNoDelay());
 		velocity_sub_ = nh_.subscribe("/riseq/uav/velocity", 1, &FastControllerNode::velocityCallback, this, ros::TransportHints().tcpNoDelay());
+		imu_sub_ = nh_.subscribe("/riseq/uav/sensors/imu", 1, &FastControllerNode::imuCallback, this, ros::TransportHints().tcpNoDelay());
 		high_input_publisher_ = nh_.advertise<mav_msgs::RateThrust>("/riseq/uav/rateThrust", 1);
 		low_input_publisher_ = nh_.advertise<mav_msgs::Actuators>("/riseq/uav/motorspeed", 1);
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
 		high_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &FastControllerNode::computeHighControlInputs, this); // Define timer for constant loop rate
-	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(0.005), &FastControllerNode::computeLowControlInputs, this);
+	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(5), &FastControllerNode::computeLowControlInputs, this);
 
 		// initialize members
 		p_ref_ << 0., 0., 0.;
@@ -39,7 +40,11 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		torque_vector_ = Eigen::Vector3d::Zero();
 		rotor_rpms_ = Eigen::Vector4d::Zero();
 
-		trajectory_received_, state_received_ = false;
+		trajectory_received_, state_received_, imu_received_ = false;
+
+		e1_ << 1., 0., 0.;
+		e2_ << 0., 1., 0.;
+		e3_ << 0., 0., 1.;
 
 		// get vehicle parameters
 		double mass, gravity;
@@ -66,7 +71,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	      vehicleInertia_(2, 2) = 0.0069;
 	  }
 
-		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr, Ko, Ct, Cq, arm_length  = 0.;
+		double Kp_x, Kp_y, Kp_z, Kd_x, Kd_y, Kd_z, Kr, Ko, Ct, Cq, arm_length, max_rpm, min_rpm  = 0.;
 
 	  if (!ros::param::get("riseq/Kp_x", Kp_x)){
 	      std::cout << "Did not get Kp_x from the params, defaulting to 4.0" << std::endl;
@@ -112,6 +117,14 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	      std::cout << "Did not get arm length from the params, defaulting to 0.08" << std::endl;
 	      arm_length = 0.08;
 	  }
+	  if (!ros::param::get("riseq/max_rotor_speed", max_rpm)){
+	      std::cout << "Did not get max_rotor_speed from the params, defaulting to 2200" << std::endl;
+	      max_rpm = 2200.0;
+	  }
+	  if (!ros::param::get("riseq/max_rotor_speed", min_rpm)){
+	      std::cout << "Did not get min_rotor_speed from the params, defaulting to 0.0" << std::endl;
+	      min_rpm = 0.00;
+	  }
 		Kp_ << Kp_x, Kp_y, Kp_z;
 		Kd_ << Kd_x, Kd_y, Kd_z;
 		Ki_ << 0., 0., 0.;
@@ -136,14 +149,17 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 											-Cq, +Cq, -Cq, +Cq;
 		}		
 		mixer_matrix_inv_ = mixer_matrix.inverse();
+		gravity_ = gravity;
+		cd1_ = 0.01;
+		rotor_count_ = 4;
 
 		//controller_ = new FeedbackLinearizationController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, gravity);
-		controller_ = new FastController(mass, 1.0, 1.0, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, Ko_, gravity, 0.01, 4);
+		controller_ = new FastController(mass, max_rpm, min_rpm, vehicleInertia_, Kp_, Kd_, Ki_, Kr_, Ko_, gravity, cd1_, rotor_count_);
 	}
 
 	void FastControllerNode::computeHighControlInputs(const ros::TimerEvent& event)
 	{
-		if(trajectory_received_ & state_received_)
+		if(trajectory_received_ & state_received_ & imu_received_)
 		{
 			Eigen::Vector3d a_des, a_cmd;
 			a_des = controller_ -> computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
@@ -153,9 +169,12 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 			desired_orientation_ = controller_ -> computeDesiredOrientation(q_, collective_thrust_vector_, yaw_ref_);
 			q_.normalize();
 			a_cmd = controller_ -> computeCommandAcceleration(q_, v_, collective_thrust_);
+			a_ = q_.toRotationMatrix() * a_imu_ - gravity_ * e3_; // transform from body to world frame
 			collective_thrust_vector_dot_ = controller_ -> computeCollectiveThrustVectorDot(v_, v_ref_, a_cmd, a_ref_, j_ref_);
-			desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
-			desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
+			//desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
+			desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot2(p_, p_ref_, v_, v_ref_, a_, a_ref_, j_, j_ref_, s_ref_, thrust_ref_, yaw_ref_, yaw_dot_ref_);
+			//desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
+			desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity2(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);			
 			publishHighControlInputs();
 		}
 		else
@@ -166,7 +185,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 
 	void FastControllerNode::computeLowControlInputs(const ros::TimerEvent& event)
 	{
-		if(trajectory_received_ & state_received_)
+		if(trajectory_received_ & state_received_ & imu_received_)
 		{
 			//torque_vector_ = controller_ -> computeDesiredTorque(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
 			
@@ -177,8 +196,6 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 			desired_angular_velocity_dot_ = controller_ -> computeDesiredAngularVelocityDot(desired_orientation_, desired_orientation_ddot_,
 				desired_angular_velocity_);
 			torque_vector_ = controller_ -> computeDesiredTorque2(q_.toRotationMatrix(), desired_orientation_, desired_angular_velocity_dot_, angular_velocity_, desired_angular_velocity_);
-			
-
 			rotor_rpms_ = controller_ -> computeRotorRPM(collective_thrust_vector_.norm(), torque_vector_, mixer_matrix_inv_);
 			publishLowControlInputs();
 		}
@@ -190,10 +207,28 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 
 	void FastControllerNode::publishHighControlInputs(void)
 	{
+
+		Eigen::Vector3d rotor_drag_ = Eigen::Vector3d::Zero();
+		Eigen::Vector3d wzb = q_.toRotationMatrix() * e3_;
+
+		double k = controller_ -> k_;
+		double b = controller_ -> b_;
+		double thrust_linearization = command_thrust_ * k + rotor_count_ * b;
+		rotor_drag_ = ( thrust_linearization * cd1_ * v_.dot(wzb))*wzb - (thrust_linearization) * cd1_ * v_;
+
+		geometry_msgs::PoseStamped desired_orientation_msg;
+		desired_orientation_msg.header.stamp = ros::Time::now();
+		desired_orientation_msg.header.frame_id = "map";
+		desired_orientation_msg.pose.position.x = rotor_drag_(0);
+		desired_orientation_msg.pose.position.y = rotor_drag_(1);
+		desired_orientation_msg.pose.position.z = -rotor_drag_(2);
+		rdes_publisher_.publish(desired_orientation_msg);
+
 		mav_msgs::RateThrust command_msg;
 
 		command_msg.header.stamp = ros::Time::now();
 		command_msg.header.frame_id = "map";
+		command_msg.thrust.x = thrust_linearization;
 		command_msg.thrust.y = collective_thrust_;
 		command_msg.thrust.z = command_thrust_;
 		command_msg.angular_rates.x = desired_angular_velocity_(0);
@@ -219,7 +254,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		desired_orientation_msg.pose.orientation.y = v_(1); //des_q.y();
 		desired_orientation_msg.pose.orientation.z = v_ref_(0); //des_q.z();
 		desired_orientation_msg.pose.orientation.w = v_ref_(1); //des_q.w();
-		rdes_publisher_.publish(desired_orientation_msg);
+			rdes_publisher_.publish(desired_orientation_msg);
 		*/
 
 		mav_msgs::Actuators command_msg;
@@ -238,6 +273,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		v_ref_ << msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z;
 		a_ref_ << msg.acc.x, msg.acc.y, msg.acc.z;
 		j_ref_ << msg.jerk.x, msg.jerk.y, msg.jerk.z;
+		j_ref_ << 0.,0.,0.;
 		s_ref_ << msg.snap.x, msg.snap.y, msg.snap.z;
 
 		q_ref_.w() = msg.pose.orientation.w;
@@ -275,6 +311,12 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	{
 		v_ << msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z;
 		angular_velocity_ << msg.twist.angular.x , msg.twist.angular.y, msg.twist.angular.z;
+	}
+
+	void FastControllerNode::imuCallback(const sensor_msgs::Imu &msg)
+	{
+		a_imu_ << msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z;
+		imu_received_ = true;
 	}
 
 	void FastControllerNode::initializeParameters(void)
