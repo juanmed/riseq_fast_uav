@@ -4,4 +4,6 @@
 [submodule "riseq_common/libs/linear_algebra_utils"]
 	path = riseq_common/libs/linear_algebra_utils
 	url = https://github.com/juanmed/linear_algebra_utils
-
+[submodule "riseq_estimation/libs/multicopter_jerk_estimation"]
+	path = riseq_estimation/libs/multicopter_jerk_estimation
+	url = https://github.com/juanmed/multicopter_jerk_estimation
