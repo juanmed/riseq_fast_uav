@@ -8,12 +8,14 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <riseq_msgs/FlatTrajectory.h>
 #include <mav_msgs/RateThrust.h>
 #include <mav_msgs/Actuators.h>
 #include <sensor_msgs/Imu.h>
 #include "../libs/fast_controller/fast_controller.h"
 #include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
+#include <linear_algebra_utils/utils.h>
 
 class FastControllerNode
 {
@@ -30,6 +32,7 @@ class FastControllerNode
 		ros::Subscriber position_sub_;
 		ros::Subscriber velocity_sub_;
 		ros::Subscriber imu_sub_;
+		ros::Subscriber jerk_sub_;
 		ros::Publisher high_input_publisher_;
 		ros::Publisher low_input_publisher_;
 		ros::Publisher rdes_publisher_;
@@ -74,7 +77,7 @@ class FastControllerNode
 		Eigen::Vector3d desired_angular_velocity_dot_;
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
-		double collective_thrust_;
+		double collective_thrust_, collective_thrust_dot_, collective_thrust_2;
 		double command_thrust_;
 
 		// sensors
@@ -111,7 +114,7 @@ class FastControllerNode
 		void velocityCallback(const geometry_msgs::TwistStamped& msg);
 		void trajectoryCallback(const riseq_msgs::FlatTrajectory& msg);
 		void imuCallback(const sensor_msgs::Imu& msg);
-
+		void jerkCallback(const geometry_msgs::Vector3Stamped& msg);
 		void initializeParameters(void);
 
 };

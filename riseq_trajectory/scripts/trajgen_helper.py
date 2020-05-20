@@ -72,8 +72,8 @@ def get_helix_waypoints(t, n, init_pos = (0,0,0)):
     """
     waypoints_t = np.linspace(0, t, n)
 
-    a = 12
-    b = 12
+    a = 4
+    b = 4
     c = 3
 
     wx = 1.0#waypoints_t*1/t #

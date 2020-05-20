@@ -9,6 +9,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		position_sub_ = nh_.subscribe("/riseq/uav/position", 1, &FastControllerNode::positionCallback, this, ros::TransportHints().tcpNoDelay());
 		velocity_sub_ = nh_.subscribe("/riseq/uav/velocity", 1, &FastControllerNode::velocityCallback, this, ros::TransportHints().tcpNoDelay());
 		imu_sub_ = nh_.subscribe("/riseq/uav/sensors/imu", 1, &FastControllerNode::imuCallback, this, ros::TransportHints().tcpNoDelay());
+		jerk_sub_ = nh_.subscribe("/riseq/uav/jerk", 1, &FastControllerNode::jerkCallback, this, ros::TransportHints().tcpNoDelay());
 		high_input_publisher_ = nh_.advertise<mav_msgs::RateThrust>("/riseq/uav/rateThrust", 1);
 		low_input_publisher_ = nh_.advertise<mav_msgs::Actuators>("/riseq/uav/motorspeed", 1);
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
@@ -39,7 +40,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		desired_angular_velocity_ = Eigen::Vector3d::Zero();
 		torque_vector_ = Eigen::Vector3d::Zero();
 		rotor_rpms_ = Eigen::Vector4d::Zero();
-
+    collective_thrust_, collective_thrust_dot_, command_thrust_,  collective_thrust_2 = 0.0;
 		trajectory_received_, state_received_, imu_received_ = false;
 
 		e1_ << 1., 0., 0.;
@@ -161,7 +162,8 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	{
 		if(trajectory_received_ & state_received_ & imu_received_)
 		{
-			Eigen::Vector3d a_des, a_cmd;
+			Eigen::Vector3d a_des, a_cmd, wzb, wzb_dot;
+			Eigen::Matrix3d Rbw;
 			a_des = controller_ -> computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 			collective_thrust_ = controller_ -> computeCollectiveThrust(q_, a_des, v_, thrust_ref_);
 			command_thrust_ = controller_ -> computeCommandThrust(q_, v_, collective_thrust_);
@@ -169,8 +171,13 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 			desired_orientation_ = controller_ -> computeDesiredOrientation(q_, collective_thrust_vector_, yaw_ref_);
 			q_.normalize();
 			a_cmd = controller_ -> computeCommandAcceleration(q_, v_, collective_thrust_);
-			a_ = q_.toRotationMatrix() * a_imu_ - gravity_ * e3_; // transform from body to world frame
+
+			Rbw = q_.toRotationMatrix();
+			wzb = Rbw * e3_;
+			wzb_dot = rotationMatrixDerivative(Rbw, angular_velocity_) *e3_;
+			a_ = Rbw * a_imu_ - gravity_ * e3_; // transform from body to world frame
 			collective_thrust_vector_dot_ = controller_ -> computeCollectiveThrustVectorDot(v_, v_ref_, a_cmd, a_ref_, j_ref_);
+			collective_thrust_dot_ = controller_ -> computeCollectiveThrustDot(collective_thrust_vector_dot_, wzb_dot, wzb);
 			//desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
 			desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot2(p_, p_ref_, v_, v_ref_, a_, a_ref_, j_, j_ref_, s_ref_, thrust_ref_, yaw_ref_, yaw_dot_ref_);
 			//desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
@@ -228,8 +235,9 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 
 		command_msg.header.stamp = ros::Time::now();
 		command_msg.header.frame_id = "map";
-		command_msg.thrust.x = thrust_linearization;
 		command_msg.thrust.y = collective_thrust_;
+		command_msg.thrust.x = (collective_thrust_ - collective_thrust_2)/0.01; // approx derivative of collective thrust
+		collective_thrust_2 = collective_thrust_;
 		command_msg.thrust.z = command_thrust_;
 		command_msg.angular_rates.x = desired_angular_velocity_(0);
 		command_msg.angular_rates.y = desired_angular_velocity_(1);
@@ -313,10 +321,15 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		angular_velocity_ << msg.twist.angular.x , msg.twist.angular.y, msg.twist.angular.z;
 	}
 
-	void FastControllerNode::imuCallback(const sensor_msgs::Imu &msg)
+	void FastControllerNode::imuCallback(const sensor_msgs::Imu& msg)
 	{
 		a_imu_ << msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z;
 		imu_received_ = true;
+	}
+
+	void FastControllerNode::jerkCallback(const geometry_msgs::Vector3Stamped& msg)
+	{
+		j_ << msg.vector.x, msg.vector.y, msg.vector.z;
 	}
 
 	void FastControllerNode::initializeParameters(void)
