@@ -9,8 +9,7 @@ riseq:
     rotor_count : 4
     trajectory_wait: 1
     trajectory_update_rate: 200
-    controller_state_input: 'fg_true_state'
-    controller_type: 'euler_angle_controller'
+    controller_type: 'fc'
     trajectory_wait: 0
     high_level_control_wait_time: 0
     Ixx: 0.0049 

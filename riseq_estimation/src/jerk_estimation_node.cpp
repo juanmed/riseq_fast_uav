@@ -7,7 +7,7 @@ nh_private_(nh_private)
 	state_sub_ = nh_.subscribe("/riseq/uav/state", 1, &JerkEstimationNode::odometryCallback, this, ros::TransportHints().tcpNoDelay());
 	thrust_sub_ = nh_.subscribe("riseq/uav/rateThrust", 1, &JerkEstimationNode::thrustCallback, this, ros::TransportHints().tcpNoDelay());
 	imu_sub_ = nh_.subscribe("/riseq/uav/sensors/imu", 1, &JerkEstimationNode::imuCallback, this, ros::TransportHints().tcpNoDelay());
-	jerk_pub_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/riseq/uav/jerk", 1);
+	jerk_pub_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/riseq/uav/jerk", 10);
 	estimator_timer = nh_.createTimer(ros::Duration(0.01), &JerkEstimationNode::estimateJerk, this);
 
 	Eigen::Quaterniond q_ = Eigen::Quaterniond::Identity();
@@ -37,13 +37,17 @@ void JerkEstimationNode::estimateJerk(const ros::TimerEvent& event)
 {
 	Eigen::Vector3d jerk = jerk_estimator_ -> computeJerkEstimation(q_, a_imu_, angular_velocity_imu_, thrust_, thrust_dot_);
 
-	geometry_msgs::Vector3Stamped jerk_msg;
-	jerk_msg.header.frame_id = "map";
-	jerk_msg.header.stamp = ros::Time::now();
-	jerk_msg.vector.x = jerk(0);
-	jerk_msg.vector.y = jerk(1);
-	jerk_msg.vector.z = jerk(2);
-	jerk_pub_.publish(jerk_msg);
+	if(jerk.norm() < 100.)
+	{
+		geometry_msgs::Vector3Stamped jerk_msg;
+		jerk_msg.header.frame_id = "map";
+		jerk_msg.header.stamp = ros::Time::now();
+		jerk_msg.vector.x = jerk(0);
+		jerk_msg.vector.y = jerk(1);
+		jerk_msg.vector.z = jerk(2);
+		jerk_pub_.publish(jerk_msg);
+	}
+
 }
 
 void JerkEstimationNode::odometryCallback(const nav_msgs::Odometry& msg)

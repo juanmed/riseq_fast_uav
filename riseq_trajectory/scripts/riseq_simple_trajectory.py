@@ -67,7 +67,7 @@ class Trajectory_Generator2():
         #self.waypoints = self.get_waypoint_list(point_list)
         #self.waypoints = self.get_goal_waypoint( 8, 0 ,1.67)   
         #self.waypoints = trajGen3D.get_leminiscata_waypoints(4*np.pi, 18, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
-        self.waypoints = trajGen3D.get_helix_waypoints(6*np.pi, 20, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
+        self.waypoints = trajGen3D.get_helix_waypoints(4*np.pi, 17, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         #self.waypoints = trajGen3D.get_poly_waypoints(5, 6, (self.init_pose[0], self.init_pose[1], self.init_pose[2]))
         #self.waypoints = self.get_gate_waypoints()
         print("Waypoints: ")
@@ -88,8 +88,11 @@ class Trajectory_Generator2():
         #print("Yaw: {}, Heading: {}".format(trajGen3D.yaw,trajGen3D.current_heading))   
 
     def compute_reference_traj(self, time):
-        vel = 3.0
+        vel_max = 8.0
         trajectory_time = time - self.start_time
+        vel = np.clip(trajectory_time*vel_max/30.0, 0, vel_max)
+        vel = vel_max
+        #print(vel)
         flatout_trajectory = trajGen3D.generate_trajectory(trajectory_time, vel, self.waypoints, self.coeff_x, self.coeff_y, self.coeff_z)
         #flatout_trajectory = trajGen3D.gen_helix_trajectory2(trajectory_time, self.init_pose)
         #print(flatout_trajectory[0])

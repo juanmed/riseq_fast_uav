@@ -66,6 +66,7 @@ class PositionController
 		Eigen::Vector3d desired_angular_velocity_;
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
+		double collective_thrust_2;
 
 		// control gains
 		Eigen::Vector3d Kp_;

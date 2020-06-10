@@ -13,7 +13,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
 		high_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeHighControlInputs, this); // Define timer for constant loop rate
 		//mid_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &PositionController::computeMidControlInputs, this); // Define timer for constant loop rate
-	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(5), &PositionController::computeLowControlInputs, this);
+	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(0.005), &PositionController::computeLowControlInputs, this);
 
 		// initialize members
 		p_ref_ << 0., 0., 0.;
@@ -38,6 +38,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		desired_angular_velocity_ = Eigen::Vector3d::Zero();
 		torque_vector_ = Eigen::Vector3d::Zero();
 		rotor_rpms_ = Eigen::Vector4d::Zero();
+		collective_thrust_2 = 0.0;
 
 		enable_output_ = false;
 
@@ -170,10 +171,14 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	void PositionController::publishHighControlInputs(void)
 	{
 		mav_msgs::RateThrust command_msg;
+		double thrust  = thrust_vector_.norm()
 
 		command_msg.header.stamp = ros::Time::now();
 		command_msg.header.frame_id = "map";
-		command_msg.thrust.z = thrust_vector_.norm();
+		command_msg.thrust.y = thrust;
+		command_msg.thrust.x = (thrust - collective_thrust_2)/0.01; // approx derivative of collective thrust
+		collective_thrust_2 = thrust;
+		command_msg.thrust.z = thrust;
 		command_msg.angular_rates.x = desired_angular_velocity_(0);
 		command_msg.angular_rates.y = desired_angular_velocity_(1);
 		command_msg.angular_rates.z = desired_angular_velocity_(2);

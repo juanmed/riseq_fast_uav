@@ -2,24 +2,28 @@
       <arg name="mav_name" default="flightgoggles"/>
 
       <param name="max_acc" value="10.0" />
-      <param name="riseq/Kp_x" value="4.0" />
-      <param name="riseq/Kp_y" value="4.0" />
-      <param name="riseq/Kp_z" value="6.5" />   
+      <param name="riseq/Kp_x" value="2.0" />
+      <param name="riseq/Kp_y" value="2.0" />
+      <param name="riseq/Kp_z" value="2.5" />   
       <param name="riseq/Kd_x" value="1.0" />
       <param name="riseq/Kd_y" value="1.0" />
       <param name="riseq/Kd_z" value="1.0" />
-      <param name="riseq/Kr" value="8.0"/>
-      <param name="riseq/Ko" value="3.0"/>
+      <param name="riseq/Kr" value="0.05"/>
+      <param name="riseq/Ko" value="0.1"/>
       <param name="riseq/rotor_drag_coefficient" value="0.01"/>
+      <param name="riseq/controller_type" value="fc"/>
 
       <rosparam command="load" file="$(find riseq_common)/config/drones/$(arg mav_name).yaml"/>
       
       <node pkg="riseq_trajectory" type="riseq_simple_trajectory.py" name="trajectory_publisher" output="screen"/>
-	<node pkg="riseq_estimation" type="jerk_estimation_node" name="jerk_estimation_publisher" output="screen">
+	
+      <node pkg="riseq_estimation" type="jerk_estimation_node" name="jerk_estimation_publisher" output="screen">
             <remap from="/riseq/uav/state" to="/uav/state"/>
             <remap from="/riseq/uav/rateThrust" to="/uav/input/rateThrust"/>
             <remap from="/riseq/uav/sensors/imu" to="/uav/sensors/imu"/>
+            <!--remap from="/riseq/uav/jerk" to="/jerk_no"/-->
       </node>
+
       <node pkg="riseq_control" type="position_controller_node" name="position_controller" output="screen">
 		<remap from="/riseq/uav/state" to="/uav/state"/>
 		<remap from="/riseq/uav/rateThrust" to="/uav/input/rateThrust"/>
@@ -33,10 +37,18 @@
             <remap from="/riseq/uav/trajectory" to="/uav_ref_trajectory"/>
       </node>
 
-
-      <!-- /uav/state/pose/pose/position /riseq/uav/trajectory/pose/position /riseq/uav/desired_orientation/pose/orientation  /uav_ref_trajectory/pose/position /uav/input/rateThrust/thrust /uav_ref_trajectory/thrust /uav/rotordrag/vector /riseq/uav/desired_orientation/pose/position  /uav_ref_trajectory/pose/position /uav/state/pose/pose/position  -->
-      <node name="rqt_plot" type="rqt_plot" pkg="rqt_plot" args="/riseq/uav/jerk/vector /uav_ref_trajectory/jerk"/>
+      <node pkg="riseq_evaluation" type="error_metrics_node" name="error_metrics_publisher">
+            <remap from="/riseq/uav/state" to="/uav/state"/>
+            <remap from="/riseq/uav/trajectory" to="/uav_ref_trajectory"/>
+      </node>
+     
+      <!-- /uav/state/pose/pose/position /riseq/uav/trajectory/pose/position /riseq/uav/desired_orientation/pose/orientation  /uav/input/rateThrust/thrust /uav_ref_trajectory/thrust /uav/rotordrag/vector /riseq/uav/desired_orientation/pose/position  /uav_ref_trajectory/pose/position /uav/state/pose/pose/position /uav_ref_trajectory/pose/position /uav/state/pose/pose/position -->
+      <!-- uav/input/motorspeed/angular_velocities[0] /uav/input/motorspeed/angular_velocities[1] /uav/input/motorspeed/angular_velocities[2] /uav/input/motorspeed/angular_velocities[3]  /riseq/uav/desired_orientation/pose/position /riseq/uav/jerk/vector-->
+      <!--node name="rqt_plot" type="rqt_plot" pkg="rqt_plot" args="uav/input/motorspeed/angular_velocities[0] /uav/input/motorspeed/angular_velocities[1] /uav/input/motorspeed/angular_velocities[2] /uav/input/motorspeed/angular_velocities[3]"/-->
       
-      <!--node pkg="rosbag" name="rec" type="record" args="-o controller_test /uav_ref_trajectory /uav/state /uav/input/rateThrust /uav/input/motorspeed /uav/rotordrag /riseq/uav/desired_orientation"/-->
+      <!-- /uav/input/rateThrust /uav/input/motorspeed /uav/rotordrag /riseq/uav/desired_orientation-->
+      <!--node pkg="rosbag" name="rec" type="record" args="-o error_metrics /uav_ref_trajectory /uav/state /riseq/uav/error_absolute /riseq/uav/error_alternative /riseq/uav/error_stats /uav/rotordrag /uav/input/rateThrust /riseq/uav/desired_orientation"/-->
+
+      <node pkg="rosbag" name="rec" type="record" args="-o with_jerk_v6 /uav_ref_trajectory /uav/state /riseq/uav/desired_orientation /riseq/uav/jerk /riseq/uav/error_absolute /riseq/uav/error_alternative /riseq/uav/error_stats /uav/input/motorspeed  /uav/input/rateThrust /uav/rotordrag"/>
 
 </launch>

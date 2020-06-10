@@ -14,7 +14,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		low_input_publisher_ = nh_.advertise<mav_msgs::Actuators>("/riseq/uav/motorspeed", 1);
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
 		high_control_loop_timer_ = nh_.createTimer(ros::Duration(0.01), &FastControllerNode::computeHighControlInputs, this); // Define timer for constant loop rate
-	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(5), &FastControllerNode::computeLowControlInputs, this);
+	  low_control_loop_timer_ = nh_.createTimer(ros::Duration(0.005), &FastControllerNode::computeLowControlInputs, this);
 
 		// initialize members
 		p_ref_ << 0., 0., 0.;
@@ -29,8 +29,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		yaw_dot_ref_ = 0.;
 		yaw_ddot_ref_ = 0.;
 
-		p_ << 0., 0., 0.;
-		v_ << 0., 0., 0.;
+		p_, v_, a_, j_ = Eigen::Vector3d::Zero();
 		q_ = Eigen::Quaterniond::Identity();
 		angular_velocity_ << 0., 0., 0.;
 
@@ -132,7 +131,7 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		Kr_ = Kr;
 		Ko_ = Ko;
 
-		// if true, + configurate, else X configuration
+		// if true, + configuration, else X configuration
 		Eigen::Matrix4d mixer_matrix = Eigen::Matrix4d::Zero();
 		if(false)
 		{
@@ -176,12 +175,12 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 			wzb = Rbw * e3_;
 			wzb_dot = rotationMatrixDerivative(Rbw, angular_velocity_) *e3_;
 			a_ = Rbw * a_imu_ - gravity_ * e3_; // transform from body to world frame
-			collective_thrust_vector_dot_ = controller_ -> computeCollectiveThrustVectorDot(v_, v_ref_, a_cmd, a_ref_, j_ref_);
+			collective_thrust_vector_dot_ = controller_ -> computeCollectiveThrustVectorDot(v_, v_ref_, a_, a_ref_, j_ref_);
 			collective_thrust_dot_ = controller_ -> computeCollectiveThrustDot(collective_thrust_vector_dot_, wzb_dot, wzb);
 			//desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot(collective_thrust_vector_, collective_thrust_vector_dot_, yaw_ref_, yaw_dot_ref_);
 			desired_orientation_dot_ = controller_ -> computeDesiredOrientationDot2(p_, p_ref_, v_, v_ref_, a_, a_ref_, j_, j_ref_, s_ref_, thrust_ref_, yaw_ref_, yaw_dot_ref_);
-			//desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
-			desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity2(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);			
+			desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity(desired_orientation_, desired_orientation_dot_);
+			//desired_angular_velocity_ = controller_ -> computeDesiredAngularVelocity2(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);			
 			publishHighControlInputs();
 		}
 		else
@@ -194,8 +193,10 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 	{
 		if(trajectory_received_ & state_received_ & imu_received_)
 		{
+			/* Feedback Linearization angular velocity control*/
 			//torque_vector_ = controller_ -> computeDesiredTorque(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
-			
+
+			/*  Lee angular velocity control
 			collective_thrust_vector_ddot_ = controller_ -> computeCollectiveThrustVectorDDot(a_, a_ref_, j_, j_ref_, s_ref_);
 			desired_orientation_ddot_ = controller_ -> computeDesiredOrientationDDot(collective_thrust_vector_,
 			collective_thrust_vector_dot_, collective_thrust_vector_ddot_, desired_orientation_, desired_orientation_dot_,
@@ -203,6 +204,12 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 			desired_angular_velocity_dot_ = controller_ -> computeDesiredAngularVelocityDot(desired_orientation_, desired_orientation_ddot_,
 				desired_angular_velocity_);
 			torque_vector_ = controller_ -> computeDesiredTorque2(q_.toRotationMatrix(), desired_orientation_, desired_angular_velocity_dot_, angular_velocity_, desired_angular_velocity_);
+			*/
+
+			/* Rigter angular velocity control */
+			torque_vector_ = controller_ -> computeDesiredTorque3(q_.toRotationMatrix(), desired_orientation_, angular_velocity_, desired_angular_velocity_);
+			
+			/* MIXER */
 			rotor_rpms_ = controller_ -> computeRotorRPM(collective_thrust_vector_.norm(), torque_vector_, mixer_matrix_inv_);
 			publishLowControlInputs();
 		}
@@ -226,9 +233,9 @@ FastControllerNode::FastControllerNode(const ros::NodeHandle& nh, const ros::Nod
 		geometry_msgs::PoseStamped desired_orientation_msg;
 		desired_orientation_msg.header.stamp = ros::Time::now();
 		desired_orientation_msg.header.frame_id = "map";
-		desired_orientation_msg.pose.position.x = rotor_drag_(0);
-		desired_orientation_msg.pose.position.y = rotor_drag_(1);
-		desired_orientation_msg.pose.position.z = -rotor_drag_(2);
+		desired_orientation_msg.pose.position.x = a_(0);
+		desired_orientation_msg.pose.position.y = a_(1);
+		desired_orientation_msg.pose.position.z = a_(2);
 		rdes_publisher_.publish(desired_orientation_msg);
 
 		mav_msgs::RateThrust command_msg;

@@ -64,7 +64,7 @@ class FastControllerNode
 		Eigen::Vector3d v_;
 		Eigen::Quaterniond q_;
 		Eigen::Vector3d angular_velocity_;
-		Eigen::Vector3d a_, j_ = Eigen::Vector3d::Zero();
+		Eigen::Vector3d a_, j_;
 
 		// control quantities
 		Eigen::Vector3d collective_thrust_vector_;

@@ -72,9 +72,9 @@ def get_helix_waypoints(t, n, init_pos = (0,0,0)):
     """
     waypoints_t = np.linspace(0, t, n)
 
-    a = 4
-    b = 4
-    c = 3
+    a = 8
+    b = 8
+    c = 4
 
     wx = 1.0#waypoints_t*1/t #
     wy = 1.0#waypoints_t*1/t #[2.*(1-np.exp(-0.5*a)) for a in waypoints_t]
@@ -335,13 +335,13 @@ def gen_helix_trajectory2(t, init_pose):
         acceleration, jerk and snap an object going through a 3D helix 
         should have.
     """
-    t = t/2
+    t = t
 
     a = 2.0
     b = 2.0
-    c = 4.0
+    c = 2.0
 
-    wx = 0.5
+    wx = 1.0
     wy = 1.0
 
     x_0 = init_pose[0]
