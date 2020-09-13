@@ -7,6 +7,7 @@ nh_private_(nh_private)
 	state_sub_ = nh_.subscribe("/riseq/uav/state", 1, &JerkEstimationNode::odometryCallback, this, ros::TransportHints().tcpNoDelay());
 	thrust_sub_ = nh_.subscribe("riseq/uav/rateThrust", 1, &JerkEstimationNode::thrustCallback, this, ros::TransportHints().tcpNoDelay());
 	imu_sub_ = nh_.subscribe("/riseq/uav/sensors/imu", 1, &JerkEstimationNode::imuCallback, this, ros::TransportHints().tcpNoDelay());
+	imu_bias_sub_ = nh_.subscribe("/riseq/uav/sensors/imu_bias", 1, &JerkEstimationNode::imuBiasCallback, this, ros::TransportHints().tcpNoDelay());
 	jerk_pub_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/riseq/uav/jerk", 10);
 	estimator_timer = nh_.createTimer(ros::Duration(0.01), &JerkEstimationNode::estimateJerk, this);
 
@@ -60,6 +61,13 @@ void JerkEstimationNode::imuCallback(const sensor_msgs::Imu& msg)
 {
 	a_imu_ << msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z;
 	angular_velocity_imu_ << msg.angular_velocity.x , msg.angular_velocity.y, msg.angular_velocity.z;
+}
+
+void JerkEstimationNode::imuBiasCallback(const sensor_msgs::Imu& msg)
+{
+	Eigen::Vector3d ba(msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z);
+	Eigen::Vector3d bg(msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z);
+	jerk_estimator_ -> setBiases(ba, bg);
 }
 
 void JerkEstimationNode::thrustCallback(const mav_msgs::RateThrust& msg)

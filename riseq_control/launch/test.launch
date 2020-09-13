@@ -2,13 +2,13 @@
       <arg name="mav_name" default="flightgoggles"/>
 
       <param name="max_acc" value="10.0" />
-      <param name="riseq/Kp_x" value="2.0" />
-      <param name="riseq/Kp_y" value="2.0" />
-      <param name="riseq/Kp_z" value="2.5" />   
+      <param name="riseq/Kp_x" value="4.0" />
+      <param name="riseq/Kp_y" value="4.0" />
+      <param name="riseq/Kp_z" value="4.5" />   
       <param name="riseq/Kd_x" value="1.0" />
       <param name="riseq/Kd_y" value="1.0" />
       <param name="riseq/Kd_z" value="1.0" />
-      <param name="riseq/Kr" value="0.05"/>
+      <param name="riseq/Kr" value="8.05"/>
       <param name="riseq/Ko" value="0.1"/>
       <param name="riseq/rotor_drag_coefficient" value="0.01"/>
       <param name="riseq/controller_type" value="fc"/>
@@ -49,6 +49,6 @@
       <!-- /uav/input/rateThrust /uav/input/motorspeed /uav/rotordrag /riseq/uav/desired_orientation-->
       <!--node pkg="rosbag" name="rec" type="record" args="-o error_metrics /uav_ref_trajectory /uav/state /riseq/uav/error_absolute /riseq/uav/error_alternative /riseq/uav/error_stats /uav/rotordrag /uav/input/rateThrust /riseq/uav/desired_orientation"/-->
 
-      <node pkg="rosbag" name="rec" type="record" args="-o with_jerk_v6 /uav_ref_trajectory /uav/state /riseq/uav/desired_orientation /riseq/uav/jerk /riseq/uav/error_absolute /riseq/uav/error_alternative /riseq/uav/error_stats /uav/input/motorspeed  /uav/input/rateThrust /uav/rotordrag"/>
+      <node pkg="rosbag" name="rec" type="record" args="-O fc_444_highDrag_rdc_rtcontrol_v12_race_1 /uav_ref_trajectory /uav/state /riseq/uav/desired_orientation /riseq/uav/jerk /riseq/uav/error_absolute /riseq/uav/error_alternative /riseq/uav/error_stats /uav/input/motorspeed  /uav/input/rateThrust /uav/rotordrag /riseq/uav/rotordrag"/>
 
 </launch>

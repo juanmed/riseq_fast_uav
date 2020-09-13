@@ -36,12 +36,15 @@ class FastControllerNode
 		ros::Publisher high_input_publisher_;
 		ros::Publisher low_input_publisher_;
 		ros::Publisher rdes_publisher_;
+		ros::Publisher rotor_drag_force_publisher_;
 		ros::Timer high_control_loop_timer_;
 		ros::Timer mid_control_loop_timer_;
 		ros::Timer low_control_loop_timer_;
 
 		// flow control 
 		bool trajectory_received_, state_received_, imu_received_ = false;
+		double high_control_loop_period_ = 0.01;
+		double low_control_loop_period_ = 0.005;
 
 		// reference trajectory
 		Eigen::Vector3d p_ref_;
@@ -77,8 +80,10 @@ class FastControllerNode
 		Eigen::Vector3d desired_angular_velocity_dot_;
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
-		double collective_thrust_, collective_thrust_dot_, collective_thrust_2;
-		double command_thrust_;
+		Eigen::Vector3d rotor_drag_, wzb_; 
+		double collective_thrust_, collective_thrust_dot_, collective_thrust_prev_;
+		double command_thrust_, command_thrust_dot_, command_thrust_prev_;
+
 
 		// sensors
 		Eigen::Vector3d a_imu_;
@@ -116,6 +121,11 @@ class FastControllerNode
 		void imuCallback(const sensor_msgs::Imu& msg);
 		void jerkCallback(const geometry_msgs::Vector3Stamped& msg);
 		void initializeParameters(void);
+
+		inline double get_derivative(double x, double x_prev, double h)
+		{
+			return (x-x_prev)/h;
+		}
 
 };
 

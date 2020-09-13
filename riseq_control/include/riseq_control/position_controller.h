@@ -11,6 +11,7 @@
 #include <riseq_msgs/FlatTrajectory.h>
 #include <mav_msgs/RateThrust.h>
 #include <mav_msgs/Actuators.h>
+#include <sensor_msgs/Imu.h>
 #include "../libs/feedback_linearization_controller/feedback_linearization_controller.h"
 #include "../libs/fast_controller/fast_controller.h"
 
@@ -29,6 +30,7 @@ class PositionController
 		ros::Subscriber state_sub_;
 		ros::Subscriber position_sub_;
 		ros::Subscriber velocity_sub_;
+		ros::Subscriber imu_sub_;
 		ros::Publisher high_input_publisher_;
 		ros::Publisher low_input_publisher_;
 		ros::Publisher rdes_publisher_;
@@ -37,7 +39,7 @@ class PositionController
 		ros::Timer low_control_loop_timer_;
 
 		// flow control 
-		bool enable_output_;
+		bool enable_output_, imu_received_ = false;
 
 		// reference trajectory
 		Eigen::Vector3d p_ref_;
@@ -59,6 +61,7 @@ class PositionController
 		Eigen::Vector3d v_;
 		Eigen::Quaterniond q_;
 		Eigen::Vector3d angular_velocity_;
+		Eigen::Vector3d a_;
 
 		// control quantities
 		Eigen::Vector3d thrust_vector_;
@@ -67,6 +70,9 @@ class PositionController
 		Eigen::Vector3d torque_vector_;
 		Eigen::Vector4d rotor_rpms_;
 		double collective_thrust_2;
+		double gravity_;
+		// sensors
+		Eigen::Vector3d a_imu_;
 
 		// control gains
 		Eigen::Vector3d Kp_;
@@ -78,6 +84,10 @@ class PositionController
 		Eigen::Matrix3d vehicleInertia_;
 		Eigen::Matrix4d mixer_matrix_inv_;
 
+ 		// basis vector generating R^3
+ 		Eigen::Vector3d e1_;
+ 		Eigen::Vector3d e2_;
+ 		Eigen::Vector3d e3_;
 
 		// controllers
 	  FeedbackLinearizationController * fb_controller_;
@@ -94,6 +104,7 @@ class PositionController
 		void positionCallback(const geometry_msgs::PoseStamped& msg);
 		void velocityCallback(const geometry_msgs::TwistStamped& msg);
 		void trajectoryCallback(const riseq_msgs::FlatTrajectory& msg);
+		void imuCallback(const sensor_msgs::Imu& msg);
 
 		void initializeParameters(void);
 

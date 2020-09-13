@@ -1,0 +1,7 @@
+<launch>
+      <node pkg="riseq_estimation" type="jerk_estimation_node" name="jerk_estimation_publisher" output="screen">
+            <remap from="/riseq/uav/state" to="/vimo_estimator/odometry"/>
+            <remap from="/riseq/uav/rateThrust" to="/blackbird/rateThrust"/>
+            <remap from="/riseq/uav/sensors/imu" to="/blackbird/imu"/>
+      </node>
+</launch>

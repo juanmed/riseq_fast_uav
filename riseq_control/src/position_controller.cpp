@@ -8,6 +8,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		state_sub_ = nh_.subscribe("/riseq/uav/state", 1, &PositionController::odometryCallback, this, ros::TransportHints().tcpNoDelay());
 		position_sub_ = nh_.subscribe("/riseq/uav/position", 1, &PositionController::positionCallback, this, ros::TransportHints().tcpNoDelay());
 		velocity_sub_ = nh_.subscribe("/riseq/uav/velocity", 1, &PositionController::velocityCallback, this, ros::TransportHints().tcpNoDelay());
+		imu_sub_ = nh_.subscribe("/riseq/uav/sensors/imu", 1, &PositionController::imuCallback, this, ros::TransportHints().tcpNoDelay());
 		high_input_publisher_ = nh_.advertise<mav_msgs::RateThrust>("/riseq/uav/rateThrust", 1);
 		low_input_publisher_ = nh_.advertise<mav_msgs::Actuators>("/riseq/uav/motorspeed", 1);
 		rdes_publisher_ = nh_.advertise<geometry_msgs::PoseStamped>("/riseq/uav/desired_orientation", 1);
@@ -32,6 +33,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		v_ << 0., 0., 0.;
 		q_ = Eigen::Quaterniond::Identity();
 		angular_velocity_ << 0., 0., 0.;
+		a_ = Eigen::Vector3d::Zero();
 
 		thrust_vector_ << 0., 0., 0.;
 		desired_orientation_= Eigen::Matrix3d::Zero();
@@ -40,7 +42,14 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 		rotor_rpms_ = Eigen::Vector4d::Zero();
 		collective_thrust_2 = 0.0;
 
+		// sensors
+		a_imu_ = Eigen::Vector3d::Zero();
+
 		enable_output_ = false;
+
+		e1_ << 1., 0., 0.;
+		e2_ << 0., 1., 0.;
+		e3_ << 0., 0., 1.;
 
 		// get vehicle parameters
 		double mass, gravity;
@@ -50,6 +59,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	  if (!nh_private_.param<double>("riseq/gravity", gravity, 9.81)){
 	      std::cout << "Did not get gravity from the params, defaulting to 9.81" << std::endl;
 	  }
+	  gravity_ = gravity;
 
   	vehicleInertia_ = Eigen::Matrix3d::Zero();
 	  if (!nh_private_.param<double>("riseq/Ixx", vehicleInertia_(0, 0), 0.0049)){
@@ -123,13 +133,16 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 
 	void PositionController::computeHighControlInputs(const ros::TimerEvent& event)
 	{
-		if(enable_output_)
+		if(enable_output_ & imu_received_)
 		{
 			Eigen::Vector3d a_des;
+			Eigen::Matrix3d Rbw;
 			a_des = fb_controller_->computeDesiredAcceleration(p_, p_ref_, v_, v_ref_, a_ref_);
 			thrust_vector_ = fb_controller_->computeDesiredThrustVector(q_, a_des);
 			desired_orientation_ = fb_controller_->computeDesiredOrientation(thrust_vector_, yaw_ref_);
 			q_.normalize();
+			Rbw = q_.toRotationMatrix();
+			a_ = Rbw * a_imu_ - gravity_ * e3_;
 			desired_angular_velocity_ = fb_controller_->computeDesiredAngularVelocity(q_.toRotationMatrix(), desired_orientation_, euler_dot_ref_);
 			publishHighControlInputs();
 		}
@@ -155,7 +168,7 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 
 	void PositionController::computeLowControlInputs(const ros::TimerEvent& event)
 	{
-		if(enable_output_)
+		if(enable_output_ & imu_received_)
 		{
 			//torque_vector_ = fb_controller_->computeDesiredTorque(angular_velocity_, desired_angular_velocity_, torque_ref_);
 			torque_vector_ = fb_controller_->computeDesiredTorque2(angular_velocity_, desired_angular_velocity_, angular_velocity_dot_ref_);
@@ -170,8 +183,22 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 
 	void PositionController::publishHighControlInputs(void)
 	{
+
+		//Eigen::Quaterniond des_q(desired_orientation_);
+		geometry_msgs::PoseStamped desired_orientation_msg;
+		desired_orientation_msg.header.stamp = ros::Time::now();
+		desired_orientation_msg.header.frame_id = "map";
+		desired_orientation_msg.pose.position.x = a_(0);
+		desired_orientation_msg.pose.position.y = a_(1);
+		desired_orientation_msg.pose.position.z = a_(2);
+		//desired_orientation_msg.pose.orientation.x = yaw_ref_; //des_q.x();
+		//desired_orientation_msg.pose.orientation.y = v_(1); //des_q.y();
+		//desired_orientation_msg.pose.orientation.z = v_ref_(0); //des_q.z();
+		//desired_orientation_msg.pose.orientation.w = v_ref_(1); //des_q.w();
+		rdes_publisher_.publish(desired_orientation_msg);
+
 		mav_msgs::RateThrust command_msg;
-		double thrust  = thrust_vector_.norm()
+		double thrust  = thrust_vector_.norm();
 
 		command_msg.header.stamp = ros::Time::now();
 		command_msg.header.frame_id = "map";
@@ -190,21 +217,6 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{
 
 		//debugging only
-		/*
-		Eigen::Quaterniond des_q(desired_orientation_);
-		geometry_msgs::PoseStamped desired_orientation_msg;
-		desired_orientation_msg.header.stamp = ros::Time::now();
-		desired_orientation_msg.header.frame_id = "map";
-		desired_orientation_msg.pose.position.x = thrust_vector_.normalized()(0);
-		desired_orientation_msg.pose.position.y = thrust_vector_.normalized()(1);
-		desired_orientation_msg.pose.position.z = thrust_vector_.normalized()(2);
-		desired_orientation_msg.pose.orientation.x = yaw_ref_; //des_q.x();
-		desired_orientation_msg.pose.orientation.y = v_(1); //des_q.y();
-		desired_orientation_msg.pose.orientation.z = v_ref_(0); //des_q.z();
-		desired_orientation_msg.pose.orientation.w = v_ref_(1); //des_q.w();
-		rdes_publisher_.publish(desired_orientation_msg);
-		*/
-
 		mav_msgs::Actuators command_msg;
 		command_msg.header.stamp = ros::Time::now();
 		command_msg.header.frame_id = "map";
@@ -256,6 +268,12 @@ PositionController::PositionController(const ros::NodeHandle& nh, const ros::Nod
 	{
 		v_ << msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z;
 		angular_velocity_ << msg.twist.angular.x , msg.twist.angular.y, msg.twist.angular.z;
+	}
+
+	void PositionController::imuCallback(const sensor_msgs::Imu& msg)
+	{
+		a_imu_ << msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z;
+		imu_received_ = true;
 	}
 
 	void PositionController::initializeParameters(void)

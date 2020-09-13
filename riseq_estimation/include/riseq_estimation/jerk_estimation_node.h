@@ -23,6 +23,7 @@ private:
 	ros::Subscriber state_sub_;
 	ros::Subscriber thrust_sub_;
 	ros::Subscriber imu_sub_;
+	ros::Subscriber imu_bias_sub_;
 	ros::Publisher jerk_pub_;
 	ros::Timer estimator_timer;
 
@@ -36,6 +37,7 @@ private:
 	void estimateJerk(const ros::TimerEvent& event);
 	void odometryCallback(const nav_msgs::Odometry& msg);
 	void imuCallback(const sensor_msgs::Imu& msg);
+	void imuBiasCallback(const sensor_msgs::Imu& msg);
 	void thrustCallback(const mav_msgs::RateThrust& msg);
 
 };
