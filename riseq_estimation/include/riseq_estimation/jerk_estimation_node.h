@@ -9,6 +9,7 @@
 #include <mav_msgs/RateThrust.h>
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/Vector3Stamped.h>
+#include "blackbird/MotorRPM.h"
 #include "../libs/multicopter_jerk_estimation/jerk_estimator.h"
 
 class JerkEstimationNode
@@ -25,12 +26,16 @@ private:
 	ros::Subscriber imu_sub_;
 	ros::Subscriber imu_bias_sub_;
 	ros::Publisher jerk_pub_;
+	ros::Publisher imu_corrected_pub_;
 	ros::Timer estimator_timer;
 
 	Eigen::Quaterniond q_;
 	Eigen::Vector3d a_imu_;
+	Eigen::Vector3d v_;
+	Eigen::Vector3d ba_;
+	Eigen::Vector3d bg_;
 	Eigen::Vector3d angular_velocity_imu_;
-	double thrust_dot_, thrust_;
+	double thrust_dot_, thrust_, thrust_prev_;
 
 	JerkEstimator * jerk_estimator_;
 
@@ -38,7 +43,7 @@ private:
 	void odometryCallback(const nav_msgs::Odometry& msg);
 	void imuCallback(const sensor_msgs::Imu& msg);
 	void imuBiasCallback(const sensor_msgs::Imu& msg);
-	void thrustCallback(const mav_msgs::RateThrust& msg);
+	void thrustCallback(const blackbird::MotorRPM& msg);
 
 };
 

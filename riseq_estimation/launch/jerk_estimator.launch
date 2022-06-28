@@ -1,7 +1,15 @@
 <launch>
+	  <arg name="bagname" default="record"/>
+      <param name="riseq/mass" value="0.915" />
+      <param name="riseq/gravity" value="9.81" />
+      <param name="riseq/rotor_drag_coefficient" value="0.01" /> 
       <node pkg="riseq_estimation" type="jerk_estimation_node" name="jerk_estimation_publisher" output="screen">
             <remap from="/riseq/uav/state" to="/vimo_estimator/odometry"/>
-            <remap from="/riseq/uav/rateThrust" to="/blackbird/rateThrust"/>
+            <remap from="/riseq/uav/rateThrust" to="/blackbird/rotor_rpm"/>
             <remap from="/riseq/uav/sensors/imu" to="/blackbird/imu"/>
+            <remap from="/riseq/uav/sensors/imu_bias" to="/vimo_estimator/biases"/>
       </node>
+
+	<node pkg="rosbag" name="rec" type="record" args="-O $(arg bagname) /riseq/uav/jerk /riseq/uav/sensors/imu_corrected /vimo_estimator/odometry"/>
+
 </launch>
